@@ -1,0 +1,117 @@
+name: Code Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Prettier
+        run: npm install --global prettier
+
+      - name: Auto-fix formatting
+        run: prettier --write "**/*.html" "**/*.css" "**/*.js" --ignore-unknown || true
+
+      - name: Commit fixes if any
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet || (git add -A && git commit -m "chore: auto-fix formatting")
+
+      - name: Push fixes
+        run: git push || true
+
+      - name: Check for large files (>1MB)
+        run: |
+          find . -not -path './.git/*' -size +1M -exec echo "WARNING: Large file found: {}" \;
+
+      - name: Check for remaining issues
+        id: issues
+        run: |
+          ERRORS=""
+          CONSOLELOGS=$(grep -rn --include="*.js" --include="*.html" "console\.log" . 2>/dev/null || true)
+          MARKERS=$(grep -rn --include="*.html" --include="*.js" "TODO\|FIXME\|HACK" . 2>/dev/null || true)
+          if [ -n "$CONSOLELOGS" ]; then ERRORS="console.log found"; fi
+          if [ -n "$MARKERS" ]; then ERRORS="$ERRORS TODO/FIXME/HACK found"; fi
+          if [ -n "$ERRORS" ]; then
+            echo "HAS_ERRORS=true" >> $GITHUB_OUTPUT
+            echo "ERROR_DETAIL=$ERRORS" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_ERRORS=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Attempts 2 through 5 repeat this block verbatim, varying only the commit
+      # message. It should be a loop. See REVIEW-NOTES.md at the repo root.
+      - name: Retry (attempt 2)
+        id: retry2
+        if: steps.issues.outputs.HAS_ERRORS == 'true'
+        run: |
+          prettier --write "**/*.html" "**/*.css" "**/*.js" --ignore-unknown || true
+          git diff --quiet || (git add -A && git commit -m "chore: auto-fix formatting (retry 2)" && git push) || true
+          CONSOLELOGS=$(grep -rn --include="*.js" --include="*.html" "console\.log" . 2>/dev/null || true)
+          MARKERS=$(grep -rn --include="*.html" --include="*.js" "TODO\|FIXME\|HACK" . 2>/dev/null || true)
+          if [ -n "$CONSOLELOGS" ] || [ -n "$MARKERS" ]; then echo "STILL_ERRORS=true" >> $GITHUB_OUTPUT; else echo "STILL_ERRORS=false" >> $GITHUB_OUTPUT; fi
+
+      - name: Retry (attempt 3)
+        id: retry3
+        if: steps.retry2.outputs.STILL_ERRORS == 'true'
+        run: |
+          prettier --write "**/*.html" "**/*.css" "**/*.js" --ignore-unknown || true
+          git diff --quiet || (git add -A && git commit -m "chore: auto-fix formatting (retry 3)" && git push) || true
+          CONSOLELOGS=$(grep -rn --include="*.js" --include="*.html" "console\.log" . 2>/dev/null || true)
+          MARKERS=$(grep -rn --include="*.html" --include="*.js" "TODO\|FIXME\|HACK" . 2>/dev/null || true)
+          if [ -n "$CONSOLELOGS" ] || [ -n "$MARKERS" ]; then echo "STILL_ERRORS=true" >> $GITHUB_OUTPUT; else echo "STILL_ERRORS=false" >> $GITHUB_OUTPUT; fi
+
+      - name: Retry (attempt 4)
+        id: retry4
+        if: steps.retry3.outputs.STILL_ERRORS == 'true'
+        run: |
+          prettier --write "**/*.html" "**/*.css" "**/*.js" --ignore-unknown || true
+          git diff --quiet || (git add -A && git commit -m "chore: auto-fix formatting (retry 4)" && git push) || true
+          CONSOLELOGS=$(grep -rn --include="*.js" --include="*.html" "console\.log" . 2>/dev/null || true)
+          MARKERS=$(grep -rn --include="*.html" --include="*.js" "TODO\|FIXME\|HACK" . 2>/dev/null || true)
+          if [ -n "$CONSOLELOGS" ] || [ -n "$MARKERS" ]; then echo "STILL_ERRORS=true" >> $GITHUB_OUTPUT; else echo "STILL_ERRORS=false" >> $GITHUB_OUTPUT; fi
+
+      - name: Retry (attempt 5)
+        id: retry5
+        if: steps.retry4.outputs.STILL_ERRORS == 'true'
+        run: |
+          prettier --write "**/*.html" "**/*.css" "**/*.js" --ignore-unknown || true
+          git diff --quiet || (git add -A && git commit -m "chore: auto-fix formatting (retry 5)" && git push) || true
+          CONSOLELOGS=$(grep -rn --include="*.js" --include="*.html" "console\.log" . 2>/dev/null || true)
+          MARKERS=$(grep -rn --include="*.html" --include="*.js" "TODO\|FIXME\|HACK" . 2>/dev/null || true)
+          if [ -n "$CONSOLELOGS" ] || [ -n "$MARKERS" ]; then echo "STILL_ERRORS=true" >> $GITHUB_OUTPUT; else echo "STILL_ERRORS=false" >> $GITHUB_OUTPUT; fi
+
+      # The escalation. Five automated attempts have failed, so hand it to the
+      # agent with everything it needs to pick the job up, and reach a human only
+      # if the agent cannot finish it.
+      - name: Open GitHub Issue if still broken
+        if: steps.retry5.outputs.STILL_ERRORS == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Code Check Failed] ${context.sha.substring(0,7)} — needs attention`,
+              body: `## Code check failed after 5 auto-fix attempts\n\n**Repo:** ${context.repo.repo}\n**Commit:** ${context.sha}\n**Branch:** ${context.ref}\n**Run:** ${context.runId}\n\nAuto-formatting was attempted 5 times but issues remain. Hermes: please diagnose, fix, push, and close this issue. If you cannot fix it, escalate to Cat.\n\n[View workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+            })
