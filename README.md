@@ -12,11 +12,12 @@ I build with LLMs and structured agent workflows. I define the problem and what 
 | [04](04-knowledge-grounded-adviser) | An LLM adviser over a private knowledge base | LLM API integration, prompt caching, model-tier cost control |
 | [05](05-database-and-rls) | Schema, constraints and row level security | Relational design, access control, data integrity |
 
-## Live
+## Live now
 
-- **cultivatingthefruit.com** — the funnel behind 01
 - **app.cultivatingthefruit.com** — the app behind 05
 - **kindredsystems.com.au** — the site behind 03
+
+The funnel behind 01 is deployed at cultivatingthefruit.com and has run in production, but it is paused at the moment: the app is in a testing round and I am not selling during it.
 
 ## Read this too
 

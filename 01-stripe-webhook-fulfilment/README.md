@@ -1,6 +1,8 @@
 # Stripe → Supabase → Loops fulfilment
 
-From the Cultivating the Fruit funnel, live at cultivatingthefruit.com. This is the file that runs when someone buys.
+From the Cultivating the Fruit funnel at cultivatingthefruit.com. This is the file that runs when someone buys.
+
+The funnel is paused at the moment, because the app it sells is in a testing round and I am not selling during it. This code has run in production.
 
 ## What it does
 
