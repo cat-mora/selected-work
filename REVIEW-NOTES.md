@@ -46,9 +46,13 @@ Compared with `!==`, which returns as soon as two bytes differ and so leaks leng
 
 ### 03 — Self-healing CI
 
+**The retry block is copy-pasted four times where it should be a loop.** The only thing that varies between them is the commit message. I have rewritten it as a single loop with the attempt count as one variable, but that version is not deployed yet, so what is in this repository is what is actually running rather than the tidier version. A reviewer is right to flag the duplication.
+
 **`|| true` on nearly every step means the workflow cannot fail.** Deliberate: its job is to fix and escalate, not to block a static site deploy. It does mean a green "Code Check" tells you nothing by itself. The Issue it raises is the real signal.
 
 **`permissions: contents: write` with an auto-commit on every branch.** Fine for a personal repository. In a shared one, a workflow that pushes on any push needs more thought than I have given it.
+
+**The `console.log` grep has no ignore list**, so it would match vendored or minified files if the site had any.
 
 ### 04 — Knowledge-grounded adviser
 
